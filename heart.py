@@ -20,17 +20,16 @@ pd.options.display.float_format = '{:.6f}'.format
 
 class HeartDiseaseModel:
     """
-    A modular pipeline class for preprocessing, training, and evaluating a machine learning model
-    on a heart disease dataset.
+    A class to preprocess data, train a model, and evaluate it for heart disease prediction.
     """
 
     def __init__(self, model: Optional[ClassifierMixin] = None, data_path: str = 'Heart_Disease_Prediction.csv') -> None:
         """
-        Initializes the HeartDiseaseModel class.
+        Initializes the HeartDiseaseModel.
 
-        Parameters:
-        - model: Optional sklearn classifier, defaults to Logistic Regression if None
-        - data_path: Path to the CSV dataset
+        Args:
+            model (Optional[ClassifierMixin]): An optional scikit-learn classifier. Defaults to LogisticRegression.
+            data_path (str): Path to the heart disease dataset CSV file.
         """
         self.model: ClassifierMixin = model if model else LogisticRegression()
         self.data_path: str = data_path
@@ -38,32 +37,32 @@ class HeartDiseaseModel:
 
     def get_password(self) -> Optional[str]:
         """
-        Loads and returns a password stored in an environment variable.
+        Loads and retrieves the password from a `.env` file.
 
         Returns:
-        - Password as a string if available, otherwise None
+            Optional[str]: The password stored under the environment variable 'PASSWORD', or None if not found.
         """
         load_dotenv()
         return os.getenv("PASSWORD")
 
     def load_data(self) -> DataFrame:
         """
-        Loads the dataset from the specified CSV file.
+        Loads the dataset from a CSV file.
 
         Returns:
-        - Pandas DataFrame containing the dataset
+            DataFrame: A pandas DataFrame containing the dataset.
         """
         return pd.read_csv(self.data_path)
 
     def convert_dtypes(self, df: DataFrame) -> DataFrame:
         """
-        Converts specific columns to categorical datatypes.
+        Converts relevant columns to 'category' data type.
 
-        Parameters:
-        - df: Input DataFrame
+        Args:
+            df (DataFrame): Raw input DataFrame.
 
         Returns:
-        - DataFrame with converted data types
+            DataFrame: DataFrame with converted categorical columns.
         """
         cat_cols = [
             'Sex', 'Chest pain type', 'FBS over 120', 'EKG results',
@@ -76,13 +75,13 @@ class HeartDiseaseModel:
 
     def remove_outliers(self, df: DataFrame) -> DataFrame:
         """
-        Removes rows with outliers using the IQR method.
+        Removes outliers using the IQR method from all numerical columns.
 
-        Parameters:
-        - df: Input DataFrame
+        Args:
+            df (DataFrame): Input DataFrame.
 
         Returns:
-        - Cleaned DataFrame with outliers removed
+            DataFrame: Cleaned DataFrame with outliers removed.
         """
         num_df = df.select_dtypes(include='number')
         Q1 = num_df.quantile(0.25)
@@ -92,16 +91,13 @@ class HeartDiseaseModel:
 
     def encode_and_scale(self, df: DataFrame) -> Tuple[DataFrame, Series, DataFrame, Series]:
         """
-        Encodes categorical variables, scales features, and splits data into train and test sets.
+        Encodes categorical columns, scales features, and splits data into train and test sets.
 
-        Parameters:
-        - df: Input DataFrame
+        Args:
+            df (DataFrame): Preprocessed DataFrame.
 
         Returns:
-        - X_train_scaled: Scaled training features
-        - y_train: Training labels
-        - X_test_scaled: Scaled test features
-        - y_test: Test labels
+            Tuple[DataFrame, Series, DataFrame, Series]: X_train, y_train, X_test, y_test datasets.
         """
         df['Heart Disease'] = df['Heart Disease'].replace({'Presence': 1, 'Absence': 0})
 
@@ -124,13 +120,13 @@ class HeartDiseaseModel:
 
     def train_and_evaluate(self, X_train: DataFrame, y_train: Series, X_test: DataFrame, y_test: Series) -> None:
         """
-        Trains the classifier and evaluates it using classification metrics.
+        Trains the model and prints evaluation metrics on the test set.
 
-        Parameters:
-        - X_train: Scaled training features
-        - y_train: Training labels
-        - X_test: Scaled test features
-        - y_test: Test labels
+        Args:
+            X_train (DataFrame): Scaled training features.
+            y_train (Series): Training labels.
+            X_test (DataFrame): Scaled test features.
+            y_test (Series): Test labels.
         """
         self.model.fit(X_train, y_train)
         y_pred = self.model.predict(X_test)
@@ -141,7 +137,7 @@ class HeartDiseaseModel:
 
     def run_pipeline(self) -> None:
         """
-        Executes the complete data processing and model training pipeline.
+        Runs the full end-to-end pipeline: load, preprocess, split, train, and evaluate.
         """
         df = self.load_data()
         df = self.convert_dtypes(df)
