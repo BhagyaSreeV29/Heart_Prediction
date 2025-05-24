@@ -1,122 +1,156 @@
-#Importing Packages
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt 
-import seaborn as sns
 import os
 from dotenv import load_dotenv
-
-# to suppress warnings 
 from warnings import filterwarnings
+from typing import Tuple, Optional
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from sklearn.base import ClassifierMixin
+from pandas import DataFrame, Series
+
 filterwarnings('ignore')
 
-# display all columns of the dataframe
 pd.options.display.max_columns = None
-
-# display all rows of the dataframe
 pd.options.display.max_rows = None
- 
-# to display the float values upto 6 decimal places     
 pd.options.display.float_format = '{:.6f}'.format
- 
-#Importing Train-Test split for validation
-from sklearn.model_selection import train_test_split
 
-# to perform Scaling
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
 
-# import various functions from sklearn
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
-from sklearn.linear_model import LogisticRegression 
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.ensemble import StackingClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
+class HeartDiseaseModel:
+    """
+    A modular pipeline class for preprocessing, training, and evaluating a machine learning model
+    on a heart disease dataset.
+    """
 
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
-from sklearn.model_selection import GridSearchCV
+    def __init__(self, model: Optional[ClassifierMixin] = None, data_path: str = 'Heart_Disease_Prediction.csv') -> None:
+        """
+        Initializes the HeartDiseaseModel class.
 
-# import function to perform feature selection
-from sklearn.feature_selection import RFE
+        Parameters:
+        - model: Optional sklearn classifier, defaults to Logistic Regression if None
+        - data_path: Path to the CSV dataset
+        """
+        self.model: ClassifierMixin = model if model else LogisticRegression()
+        self.data_path: str = data_path
+        self.scaler: StandardScaler = StandardScaler()
 
-class Model:
-    def __init__(self, model):
-        self.model = model
+    def get_password(self) -> Optional[str]:
+        """
+        Loads and returns a password stored in an environment variable.
 
-    def get_password(self):
-      load_dotenv()
-      # Assuming the password is stored in an environment variable named 'PASSWORD'
-      return os.getenv("PASSWORD")
+        Returns:
+        - Password as a string if available, otherwise None
+        """
+        load_dotenv()
+        return os.getenv("PASSWORD")
 
-    def preprocess_data(self):
-      #Load the dataset
-      df=pd.read_csv('Heart_Disease_Prediction.csv')
+    def load_data(self) -> DataFrame:
+        """
+        Loads the dataset from the specified CSV file.
 
-      #Changing the data types of the columns
-      df['Sex']=df['Sex'].astype('category')
-      df['Chest pain type']=df['Chest pain type'].astype('category')
-      df['FBS over 120']=df['FBS over 120'].astype('category')
-      df['EKG results']=df['EKG results'].astype('category')
-      df['Exercise angina']=df['Exercise angina'].astype('category')
-      df['Slope of ST']=df['Slope of ST'].astype('category')
-      df['Number of vessels fluro']=df['Number of vessels fluro'].astype('category')
-      df['Thallium']=df['Thallium'].astype('category')
-      df['Heart Disease']=df['Heart Disease'].astype('category')
-      #Since Age feature doesn't require any outlier analysis,changing the type of variable for instance to skip the outlier analysis.
-      df['Age']=df['Age'].astype('category')
+        Returns:
+        - Pandas DataFrame containing the dataset
+        """
+        return pd.read_csv(self.data_path)
 
-      #Outlier Analysis
-      df_new = df[
-          ~((df.select_dtypes(include='number') < (df.select_dtypes(include='number').quantile(0.25) - 1.5 * (df.select_dtypes(include='number').quantile(0.75) - df.select_dtypes(include='number').quantile(0.25)))) |
-            (df.select_dtypes(include='number') > (df.select_dtypes(include='number').quantile(0.75) + 1.5 * (df.select_dtypes(include='number').quantile(0.75) - df.select_dtypes(include='number').quantile(0.25))))
-          ).any(axis=1)
-      ]
-      #Chaning the Age Feature back to its original type.
-      df['Age']=df['Age'].astype('int')
+    def convert_dtypes(self, df: DataFrame) -> DataFrame:
+        """
+        Converts specific columns to categorical datatypes.
 
-      Cat_columns=df.select_dtypes(include='category').columns
-      Num_columns=df.select_dtypes(include='int').columns
-      #Removing the target variable from the categorical columns
-      Cat_columns=Cat_columns.drop('Heart Disease')
-      #Encoding the categorical variables
-      Encoded=pd.get_dummies(df_new[Cat_columns], drop_first=True)
-      df_encoded=pd.concat([df_new[Num_columns], Encoded], axis=1)
+        Parameters:
+        - df: Input DataFrame
 
-      df_new['Heart Disease']=df_new['Heart Disease'].replace({'Presence':1, 'Absence':0})
-      df_encoded['Heart Disease']=df_new['Heart Disease']
+        Returns:
+        - DataFrame with converted data types
+        """
+        cat_cols = [
+            'Sex', 'Chest pain type', 'FBS over 120', 'EKG results',
+            'Exercise angina', 'Slope of ST', 'Number of vessels fluro',
+            'Thallium', 'Heart Disease'
+        ]
+        for col in cat_cols:
+            df[col] = df[col].astype('category')
+        return df
 
-      #Splitting the data into train and test
-      X = df_encoded.drop('Heart Disease', axis=1)
-      y = df_encoded['Heart Disease']
-      X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)  
-      scaler=StandardScaler()
-      X_train_scaled = scaler.fit_transform(X_train)
-      Xtrain=pd.DataFrame(X_train_scaled, columns=X_train.columns)
-      X_test_scaled = scaler.transform(X_test)
-      Xtest=pd.DataFrame(X_test_scaled, columns=X_test.columns)
-      self.train_model(Xtrain, y_train, Xtest, y_test)
-    
-  
+    def remove_outliers(self, df: DataFrame) -> DataFrame:
+        """
+        Removes rows with outliers using the IQR method.
 
-    def train_model(self, Xtrain, y_train, Xtest, y_test):
-      #Logistic Regression
-      Logreg=LogisticRegression()
-      Logreg.fit(Xtrain, y_train)
+        Parameters:
+        - df: Input DataFrame
 
-      print(classification_report(y_test, Logreg.predict(Xtest)))
-      print(confusion_matrix(y_test, Logreg.predict(Xtest)))
-      print(roc_auc_score(y_test, Logreg.predict(Xtest)))
+        Returns:
+        - Cleaned DataFrame with outliers removed
+        """
+        num_df = df.select_dtypes(include='number')
+        Q1 = num_df.quantile(0.25)
+        Q3 = num_df.quantile(0.75)
+        IQR = Q3 - Q1
+        return df[~((num_df < (Q1 - 1.5 * IQR)) | (num_df > (Q3 + 1.5 * IQR))).any(axis=1)]
 
-       
-  
-#Create an instance of the Model class
-model_instance = Model(model=None)
-model_instance.get_password()
-model_instance.preprocess_data()
+    def encode_and_scale(self, df: DataFrame) -> Tuple[DataFrame, Series, DataFrame, Series]:
+        """
+        Encodes categorical variables, scales features, and splits data into train and test sets.
+
+        Parameters:
+        - df: Input DataFrame
+
+        Returns:
+        - X_train_scaled: Scaled training features
+        - y_train: Training labels
+        - X_test_scaled: Scaled test features
+        - y_test: Test labels
+        """
+        df['Heart Disease'] = df['Heart Disease'].replace({'Presence': 1, 'Absence': 0})
+
+        cat_columns = df.select_dtypes(include='category').columns.drop('Heart Disease')
+        num_columns = df.select_dtypes(include='int').columns
+
+        encoded = pd.get_dummies(df[cat_columns], drop_first=True)
+        df_encoded = pd.concat([df[num_columns], encoded], axis=1)
+        df_encoded['Heart Disease'] = df['Heart Disease']
+
+        X = df_encoded.drop('Heart Disease', axis=1)
+        y = df_encoded['Heart Disease']
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        X_train_scaled = pd.DataFrame(self.scaler.fit_transform(X_train), columns=X.columns)
+        X_test_scaled = pd.DataFrame(self.scaler.transform(X_test), columns=X.columns)
+
+        return X_train_scaled, y_train, X_test_scaled, y_test
+
+    def train_and_evaluate(self, X_train: DataFrame, y_train: Series, X_test: DataFrame, y_test: Series) -> None:
+        """
+        Trains the classifier and evaluates it using classification metrics.
+
+        Parameters:
+        - X_train: Scaled training features
+        - y_train: Training labels
+        - X_test: Scaled test features
+        - y_test: Test labels
+        """
+        self.model.fit(X_train, y_train)
+        y_pred = self.model.predict(X_test)
+
+        print("Classification Report:\n", classification_report(y_test, y_pred))
+        print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+        print("ROC AUC Score:", roc_auc_score(y_test, y_pred))
+
+    def run_pipeline(self) -> None:
+        """
+        Executes the complete data processing and model training pipeline.
+        """
+        df = self.load_data()
+        df = self.convert_dtypes(df)
+        df = self.remove_outliers(df)
+        X_train, y_train, X_test, y_test = self.encode_and_scale(df)
+        self.train_and_evaluate(X_train, y_train, X_test, y_test)
+
+
+# Run the pipeline
+if __name__ == "__main__":
+    model_instance = HeartDiseaseModel()
+    model_instance.run_pipeline()
